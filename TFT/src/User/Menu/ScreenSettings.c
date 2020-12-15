@@ -62,7 +62,7 @@ void menuLanguage(void)
       if(key_num < LISTITEM_PER_PAGE){
         uint16_t cur_item = infoSettings.language;
         uint16_t tmp_i = listWidgetGetCurPage() * LISTITEM_PER_PAGE + key_num;
-        if (tmp_i != cur_item) { // has changed
+        if (tmp_i < LANGUAGE_NUM && tmp_i != cur_item) { // has changed
           totalItems[cur_item].icon = ICONCHAR_UNCHECKED;
           listWidgetRefreshItem(cur_item); // refresh unchecked status
           cur_item = tmp_i;
@@ -87,25 +87,6 @@ void menuLanguage(void)
 }
 
 #ifdef ST7920_SPI
-const LABEL lcd_colors_names[LCD_COLOR_COUNT] =
-{
-  LABEL_WHITE,
-  LABEL_BLACK,
-  LABEL_RED,
-  LABEL_GREEN,
-  LABEL_BLUE,
-  LABEL_CYAN,
-  LABEL_MAGENTA,
-  LABEL_YELLOW,
-  LABEL_ORANGE,
-  LABEL_PURPLE,
-  LABEL_LIME,
-  LABEL_BROWN,
-  LABEL_DARKBLUE,
-  LABEL_DARKGREEN,
-  LABEL_GRAY,
-  LABEL_DARKGRAY,
-};
 
 void menuSimulatorBackGroundColor(void)
 {
@@ -124,7 +105,7 @@ void menuSimulatorBackGroundColor(void)
       totalItems[i].icon = ICONCHAR_UNCHECKED;
     }
     totalItems[i].itemType = LIST_LABEL;
-    totalItems[i].titlelabel = lcd_colors_names[i];
+    totalItems[i].titlelabel = lcd_color_names[i];
   }
 
   listWidgetCreate(title, totalItems, COUNT(totalItems), cur_item/ LISTITEM_PER_PAGE);
@@ -149,7 +130,7 @@ void menuSimulatorBackGroundColor(void)
     default:
       if(key_num < LISTITEM_PER_PAGE){
         uint16_t tmp_i = listWidgetGetCurPage() * LISTITEM_PER_PAGE + key_num;
-        if (tmp_i != cur_item) { // has changed
+        if (tmp_i < LCD_COLOR_COUNT && tmp_i != cur_item) { // has changed
           totalItems[cur_item].icon = ICONCHAR_UNCHECKED;
           listWidgetRefreshItem(cur_item); // refresh unchecked status
           cur_item = tmp_i;
@@ -188,7 +169,7 @@ void menuSimulatorFontColor(void)
       totalItems[i].icon = ICONCHAR_UNCHECKED;
     }
     totalItems[i].itemType = LIST_LABEL;
-    totalItems[i].titlelabel = lcd_colors_names[i];
+    totalItems[i].titlelabel = lcd_color_names[i];
   }
 
   listWidgetCreate(title, totalItems, COUNT(totalItems), cur_item/ LISTITEM_PER_PAGE);
@@ -213,7 +194,7 @@ void menuSimulatorFontColor(void)
     default:
       if(key_num < LISTITEM_PER_PAGE){
         uint16_t tmp_i = listWidgetGetCurPage() * LISTITEM_PER_PAGE + key_num;
-        if (tmp_i != cur_item) { // has changed
+        if (tmp_i < LCD_COLOR_COUNT && tmp_i != cur_item) { // has changed
           totalItems[cur_item].icon = ICONCHAR_UNCHECKED;
           listWidgetRefreshItem(cur_item); // refresh unchecked status
           cur_item = tmp_i;
@@ -234,7 +215,7 @@ void menuSimulatorFontColor(void)
     storePara();
   }
 }
-#endif
+#endif // ST7920_SPI
 
 #ifdef BUZZER_PIN
 
@@ -303,7 +284,7 @@ void menuSoundSettings(void)
   }
 } //menuSoundSettings
 
-#endif
+#endif // BUZZER_PIN
 
 void menuScreenSettings(void)
 {
@@ -377,7 +358,10 @@ void menuScreenSettings(void)
         break;
 
       case KEY_ICON_2:
-        infoMenu.menu[++infoMenu.cur] = menuLanguage;
+        if (getFlashSignStatus(lang_sign))
+          infoMenu.menu[++infoMenu.cur] = menuLanguage;
+        else
+          popupReminder(DIALOG_TYPE_ALERT,(u8*)"Language not available", (u8*)"To change Language first flash a Language pack ini file.");
         break;
 
       #ifdef BUZZER_PIN

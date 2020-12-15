@@ -20,8 +20,10 @@ extern "C" {
 
 #ifdef RAPID_SERIAL_COMM
 #define rapid_serial_loop()  loopBackEnd()
+#define rapid_serial_comm()  if(isPrinting() == true && infoSettings.serial_alwaysOn != 1){loopBackEnd();}
 #else
 #define rapid_serial_loop()
+#define rapid_serial_comm()
 #endif
 
 
@@ -52,12 +54,11 @@ void setPrintingTime(uint32_t RTtime);
 
 void exitPrinting(void);
 void endPrinting(void);
-void completePrinting(void);
+void printingFinished(void);
 void abortPrinting(void);
 uint8_t *getCurGcodeName(char *path);
 void sendPrintCodes(uint8_t index);
 
-void setM0Pause(bool m0_pause);
 bool setPrintPause(bool is_pause, bool is_m0pause);
 
 void setPrintSize(uint32_t size);
@@ -80,8 +81,10 @@ void shutdown(void);
 void shutdownLoop(void);
 void startShutdown(void);
 
-void printingFinished(void);
 void loopCheckPrinting(void);
+
+void resetFilamentUsed(void);
+void updateFilamentUsed(void);
 
 #ifdef __cplusplus
 }

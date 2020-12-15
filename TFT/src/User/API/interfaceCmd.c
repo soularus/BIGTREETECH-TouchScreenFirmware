@@ -111,12 +111,14 @@ void mustStoreScript(const char * format,...)
   char *p = script;
   uint16_t i = 0;
   char cmd[CMD_MAX_CHAR];
-  for (;;) {
+  for (;;)
+  {
     char c = *p++;
     if (!c) return;
     cmd[i++] = c;
 
-    if (c == '\n') {
+    if (c == '\n')
+    {
       cmd[i] = 0;
       mustStoreCmd("%s", cmd);
       i = 0;
@@ -235,7 +237,17 @@ void sendQueueCmd(void)
           break;
         case 18: //M18/M84 disable steppers
         case 84:
-          coordinateSetKnown(false);
+          if(cmd_seen('S') && !cmd_seen('Y') && !cmd_seen('Z') && !cmd_seen('E'))
+          {
+            // Do not mark coordinate as unknown in this case as this is a M18/M84 S<timeout>
+            // command that doesn't disable the motors right away but will set their idling
+            // timeout.
+          }
+          else
+          {
+            // This is something else than an "M18/M84 S<timeout>", this will disable at least one stepper, set coordinate as unknown
+            coordinateSetKnown(false);
+          }
           break;
 
 #ifdef SERIAL_PORT_2
@@ -498,17 +510,34 @@ void sendQueueCmd(void)
           }
           break;
 
+        case 155: //M155
+          if (fromTFT)
+          {
+            heatSetUpdateWaiting(false);
+            if(cmd_seen('S'))
+            {
+              heatSyncUpdateSeconds(cmd_value());
+            }
+            else if (!cmd_seen('\n'))
+            {
+              char buf[12];
+              sprintf(buf, "S%u\n", heatGetUpdateSeconds());
+              strcat(infoCmd.queue[infoCmd.index_r].gcode, (const char*)buf);
+            }
+          }
+          break;
+
         case 106: //M106
         {
           uint8_t i = cmd_seen('P') ? cmd_value() : 0;
           if(cmd_seen('S') && fanIsType(i, FAN_TYPE_F) ) {
-            fanSetSpeed(i, cmd_value());
+            fanSetCurSpeed(i, cmd_value());
             fanSetSendWaiting(i, false);
           }
           else if (!cmd_seen('\n'))
           {
             char buf[12];
-            sprintf(buf, "S%u\n", fanGetSpeed(i));
+            sprintf(buf, "S%u\n", fanGetCurSpeed(i));
             strcat(infoCmd.queue[infoCmd.index_r].gcode,(const char*)buf);
           }
           break;
@@ -517,23 +546,17 @@ void sendQueueCmd(void)
         case 107: //M107
         {
           uint8_t i = cmd_seen('P') ? cmd_value() : 0;
-          if (fanIsType(i, FAN_TYPE_F)) fanSetSpeed(i, 0);
+          if (fanIsType(i, FAN_TYPE_F)) fanSetCurSpeed(i, 0);
           break;
         }
-        
+
         case 710: //M710 Controller Fan
         {
           u8 i = 0;
-          if(cmd_seen('S')) { 
-            i = fanGetTypID(i,FAN_TYPE_CTRL_S); 
-            fanSetSpeed(i, cmd_value());
-            fanSetSendWaiting(i, false);
-          }
-          if(cmd_seen('I')) { 
-            i = fanGetTypID(i=0,FAN_TYPE_CTRL_I); 
-            fanSetSpeed(i, cmd_value());
-            fanSetSendWaiting(i, false);
-          }
+          if(cmd_seen('S')) i = fanGetTypID(i,FAN_TYPE_CTRL_S);
+          if(cmd_seen('I')) i = fanGetTypID(i=0,FAN_TYPE_CTRL_I);
+          fanSetCurSpeed(i, cmd_value());
+          fanSetSendWaiting(i, false);
           break;
         }
 
@@ -684,6 +707,12 @@ void sendQueueCmd(void)
           if(cmd_seen('Y')) setParameter(P_JERK, Y_AXIS, cmd_float());
           if(cmd_seen('Z')) setParameter(P_JERK, Z_AXIS, cmd_float());
           if(cmd_seen('E')) setParameter(P_JERK, E_AXIS, cmd_float());
+          if(cmd_seen('J')) setParameter(P_JUNCTION_DEVIATION, 0, cmd_float());
+          break;
+        case 206: //M206 Home offset
+          if(cmd_seen('X')) setParameter(P_HOME_OFFSET, X_AXIS, cmd_float());
+          if(cmd_seen('Y')) setParameter(P_HOME_OFFSET, Y_AXIS, cmd_float());
+          if(cmd_seen('Z')) setParameter(P_HOME_OFFSET, Z_AXIS, cmd_float());
           break;
         case 207: //M207 FW Retract
           if(cmd_seen('S')) setParameter(P_FWRETRACT, 0, cmd_float());
@@ -724,14 +753,22 @@ void sendQueueCmd(void)
             }
             break;
         #endif
-
-        case 420: //M420
+        case 355: //M355
+        {
           if(cmd_seen('S')) {
-            infoSettings.autoLevelState = cmd_value();
-            setParameter(P_ABL_STATE,0,cmd_value());
-            if(cmd_value()==0) storeCmd("M117 ABL inactive\n");
-            else storeCmd("M117 ABL active\n");
+            caseLightSetState(cmd_value() > 0);
+            caseLightSendWaiting(false);
           }
+          if(cmd_seen('P')){
+            caseLightSetBrightness(cmd_value());
+            caseLightSendWaiting(false);
+          }
+
+          break;
+        }
+        case 420: //M420
+          //ABL state will be set through parsACK.c after receiving confirmation message from the printer
+          // to prevent wrong state in case of error.
           if(cmd_seen('Z')) setParameter(P_ABL_STATE,1,cmd_float());
         break;
 
@@ -747,6 +784,14 @@ void sendQueueCmd(void)
             }
             break;
         #endif
+
+        #ifdef LOAD_UNLOAD_M701_M702
+          case 701:  // M701 Load filament
+          case 702:  // M702 Unload filament
+            infoHost.wait = true;
+            break;
+        #endif
+
         case 851: //M851 Z probe offset
           if(cmd_seen('X')) setParameter(P_PROBE_OFFSET, X_AXIS, cmd_float());
           if(cmd_seen('Y')) setParameter(P_PROBE_OFFSET, Y_AXIS, cmd_float());
@@ -786,7 +831,7 @@ void sendQueueCmd(void)
           if(cmd_seen('Y')) setParameter(P_HYBRID_THRESHOLD, Y_STEPPER, cmd_value());
           if(cmd_seen('Z')) setParameter(P_HYBRID_THRESHOLD, Z_STEPPER, cmd_value());
           if(cmd_seen('E')) setParameter(P_HYBRID_THRESHOLD, E_STEPPER, cmd_value());
-          break;  
+          break;
       }
       break; //end parsing M-codes
 
@@ -814,27 +859,26 @@ void sendQueueCmd(void)
 
         case 28: //G28
           coordinateSetKnown(true);
-          babyReset();
+          babystepReset();
           storeCmd("M503 S0\n");
           break;
 
-        case 29: //G29
-          if(ENABLE_BL_VALUE > 0)                          // if not Disabled
-          {
-            if(cmd_seen('A'))
+        #if ENABLE_BL_VALUE > 0              // if not Disabled
+          case 29: //G29
             {
-              infoSettings.autoLevelState = 1;
-              setParameter(P_ABL_STATE,0,1);
-              storeCmd("M117 UBL active\n");
+              if(cmd_seen('A'))
+              {
+                setParameter(P_ABL_STATE,0,1);
+                storeCmd("M117 UBL active\n");
+              }
+              if(cmd_seen('D'))
+              {
+                setParameter(P_ABL_STATE,0,0);
+                storeCmd("M117 UBL inactive\n");
+              }
             }
-            if(cmd_seen('D'))
-            {
-              infoSettings.autoLevelState = 0;
-              setParameter(P_ABL_STATE,0,0);
-              storeCmd("M117 UBL inactive\n");
-            }
-          }
-          break;
+            break;
+        #endif
 
         case 90: //G90
           coorSetRelative(false);
@@ -846,17 +890,23 @@ void sendQueueCmd(void)
 
         case 92: //G92
         {
-          AXIS i;
           bool coorRelative = coorGetRelative();
           bool eRelative = eGetRelative();
           // Set to absolute mode
           coorSetRelative(false);
           eSetRelative(false);
-          for(i=X_AXIS;i<TOTAL_AXIS;i++)
+          for(AXIS i = X_AXIS; i < TOTAL_AXIS; i++)
           {
             if(cmd_seen(axis_id[i]))
             {
-              coordinateSetAxisTarget(i,cmd_float());
+              coordinateSetAxisTarget(i, cmd_float());
+              #ifdef FIL_RUNOUT_PIN
+                if (i == E_AXIS)
+                {
+                  // Reset SFS status, Avoid false Filament runout caused by G92 resetting E-axis position
+                  FIL_SFS_SetAlive(true);
+                }
+              #endif
             }
           }
           // Restore mode

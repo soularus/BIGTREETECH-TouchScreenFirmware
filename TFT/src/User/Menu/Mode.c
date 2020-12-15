@@ -38,24 +38,28 @@ void infoMenuSelect(void)
           knob_LED_Init():
         #endif
       #endif
+
+      #if ENC_ACTIVE_SIGNAL
+        setEncActiveSignal(0);
+      #endif
       GUI_RestoreColorDefault();
-      if(infoSettings.unified_menu == 1) //if Unified menu is selected
+      if(infoSettings.status_screen == 1) //if Unified menu is selected
         infoMenu.menu[infoMenu.cur] = menuStatus; //status screen as default screen on boot
       else
-        infoMenu.menu[infoMenu.cur] = classicMenu;   // classic UI
+        infoMenu.menu[infoMenu.cur] = menuMain;   // classic UI
 
       #ifdef SHOW_BTT_BOOTSCREEN
         if (freshboot)
         {
           u32 startUpTime = OS_GetTimeMs();
-          heatSetUpdateTime(TEMPERATURE_QUERY_FAST_DURATION);
+          heatSetUpdateSeconds(TEMPERATURE_QUERY_FAST_SECONDS);
           LOGO_ReadDisplay();
           updateNextHeatCheckTime(); // send "M105" 1s later not now, because of mega2560 will be hanged when received data at startup
           while (OS_GetTimeMs() - startUpTime < 3000) //Display 3s logo
           {
             loopProcess();
           }
-          heatSetUpdateTime(TEMPERATURE_QUERY_SLOW_DURATION);
+          heatSetUpdateSeconds(TEMPERATURE_QUERY_SLOW_SECONDS);
           freshboot = false;
         }
       #endif
@@ -63,6 +67,9 @@ void infoMenuSelect(void)
     }
 
     case MARLIN:
+      #if ENC_ACTIVE_SIGNAL
+        setEncActiveSignal(1);
+      #endif
       if (infoSettings.serial_alwaysOn == 1)
       {
         Serial_ReSourceInit();

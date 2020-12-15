@@ -1,6 +1,20 @@
 #include "includes.h"
 #include "More.h"
 
+const MENUITEMS moreItems = {
+  // title
+  LABEL_MORE,
+  // icon                         label
+  {{ICON_HEAT,                    LABEL_HEAT},
+   {ICON_FAN,                     LABEL_FAN},
+   {ICON_EXTRUDE,                 LABEL_EXTRUDE},
+   {ICON_PERCENTAGE,              LABEL_PERCENTAGE},
+   {ICON_FEATURE_SETTINGS,        LABEL_FEATURE_SETTINGS},
+   {ICON_MACHINE_SETTINGS,        LABEL_MACHINE_SETTINGS},
+   {ICON_GCODE,                   LABEL_TERMINAL},
+   {ICON_BACK,                    LABEL_BACK},}
+};
+
 void isPauseConfirm(void)
 {
   if(setPrintPause(true,false))
@@ -9,21 +23,6 @@ void isPauseConfirm(void)
 
 void menuMore(void)
 {
-  // 1 title, ITEM_PER_PAGE items (icon + label)
-  const MENUITEMS moreItems = {
-    // title
-    LABEL_MORE,
-    // icon                         label
-    {{ICON_HEAT,                    LABEL_HEAT},
-     {ICON_FAN,                     LABEL_FAN},
-     {ICON_EXTRUDE,                 LABEL_EXTRUDE},
-     {ICON_PERCENTAGE,              LABEL_PERCENTAGE},
-     {ICON_FEATURE_SETTINGS,        LABEL_FEATURE_SETTINGS},
-     {ICON_MACHINE_SETTINGS,        LABEL_MACHINE_SETTINGS},
-     {ICON_GCODE,                   LABEL_TERMINAL},
-     {ICON_BACK,                    LABEL_BACK},}
-  };
-
   KEY_VALUES key_num;
 
   menuDrawPage(&moreItems);
@@ -44,9 +43,8 @@ void menuMore(void)
       case KEY_ICON_2:
         if (isPrinting() && !isPause()) // need paused before extrude
         {
-          showDialog(DIALOG_TYPE_ALERT, textSelect(LABEL_WARNING),
-               textSelect(LABEL_IS_PAUSE), textSelect(LABEL_CONFIRM), textSelect(LABEL_CANCEL),
-               isPauseConfirm, NULL, NULL);
+          setDialogText(LABEL_WARNING, LABEL_IS_PAUSE, LABEL_CONFIRM, LABEL_CANCEL);
+          showDialog(DIALOG_TYPE_ALERT, isPauseConfirm, NULL, NULL);
         }
         else
           infoMenu.menu[++infoMenu.cur] = menuExtrude;
@@ -67,7 +65,7 @@ void menuMore(void)
       case KEY_ICON_6:
         infoMenu.menu[++infoMenu.cur] = menuSendGcode;
         break;
-        
+
       case KEY_ICON_7:
         infoMenu.cur--;
         break;

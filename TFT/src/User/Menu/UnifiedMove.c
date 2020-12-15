@@ -14,17 +14,18 @@ void menuUnifiedMove(void)
      {ICON_BACKGROUND,              LABEL_BACKGROUND},
      {ICON_BABYSTEP,                LABEL_BABYSTEP},
      {ICON_DISABLE_STEPPERS,        LABEL_DISABLE_STEPPERS},
-     {ICON_BACKGROUND,              LABEL_BACKGROUND},
+#ifdef LOAD_UNLOAD_M701_M702
+     {ICON_EXTRUDE,                 LABEL_LOAD_UNLOAD_SHORT},
+#else
+     {ICON_EXTRUDE,                 LABEL_EXTRUDE},
+#endif
      {ICON_BACK,                    LABEL_BACK}}
   };
 
   KEY_VALUES key_num = KEY_IDLE;
-  bool blAvailable = false;
 
-  if (infoMachineSettings.blType != BL_UNKNOWN)
+  if (infoMachineSettings.leveling != BL_DISABLED)
   {
-    blAvailable = true;
-
     UnifiedMoveItems.items[3].icon = ICON_LEVELING;
     UnifiedMoveItems.items[3].label.index = LABEL_BED_LEVELING;
   }
@@ -49,7 +50,7 @@ void menuUnifiedMove(void)
         break;
 
       case KEY_ICON_3:
-        if (blAvailable)
+        if (infoMachineSettings.leveling != BL_DISABLED)
           infoMenu.menu[++infoMenu.cur] = menuBedLeveling;
         break;
 
@@ -59,6 +60,14 @@ void menuUnifiedMove(void)
 
       case KEY_ICON_5:
         storeCmd("M84\n");
+        break;
+
+      case KEY_ICON_6:
+#ifdef LOAD_UNLOAD_M701_M702
+        infoMenu.menu[++infoMenu.cur] = menuLoadUnload;
+#else
+        infoMenu.menu[++infoMenu.cur] = menuExtrude;
+#endif
         break;
 
       case KEY_ICON_7:

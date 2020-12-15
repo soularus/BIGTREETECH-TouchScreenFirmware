@@ -6,6 +6,29 @@ PRINTING infoPrinting;
 
 static bool update_waiting = false;
 
+static float filament_used;
+static float last_E_pos;
+
+void resetFilamentUsed(void)
+{
+  filament_used = 0;
+  last_E_pos = ((infoFile.source == BOARD_SD) ? coordinateGetAxisActual(E_AXIS) : coordinateGetAxisTarget(E_AXIS));
+}
+
+void updateFilamentUsed(void)
+{
+  float E_pos = ((infoFile.source == BOARD_SD) ? coordinateGetAxisActual(E_AXIS) : coordinateGetAxisTarget(E_AXIS));
+  if ((E_pos + 20) < last_E_pos) //Check whether E position reset. If retract more than 20mm, false filament used values would be calculated.
+  {
+    filament_used = filament_used + E_pos;
+    last_E_pos = E_pos;
+  } else if (E_pos > last_E_pos)
+  {
+    filament_used = filament_used + (E_pos - last_E_pos);
+    last_E_pos = E_pos;
+  }
+}
+
 //
 bool isPrinting(void)
 {
@@ -127,7 +150,8 @@ void sendPrintCodes(uint8_t index)
   }
 }
 
-void setM0Pause(bool m0_pause){
+static inline void setM0Pause(bool m0_pause)
+{
   infoPrinting.m0_pause = m0_pause;
 }
 
@@ -167,7 +191,7 @@ bool setPrintPause(bool is_pause, bool is_m0pause)
         //if pause was triggered through M0/M1 then break
       if(is_m0pause == true) {
         setM0Pause(is_m0pause);
-        popupReminder(DIALOG_TYPE_ALERT, textSelect(LABEL_PAUSE), textSelect(LABEL_M0_PAUSE));
+        popupReminder(DIALOG_TYPE_ALERT, LABEL_PAUSE, LABEL_PAUSE);
         break;
         }
 
@@ -181,7 +205,7 @@ bool setPrintPause(bool is_pause, bool is_m0pause)
         }
         if (coordinateIsKnown())
         {
-          mustStoreCmd("G1 Z%.3f F%d\n", tmp.axis[Z_AXIS] + infoSettings.pause_z_raise, infoSettings.pause_feedrate[E_AXIS]);
+          mustStoreCmd("G1 Z%.3f F%d\n", tmp.axis[Z_AXIS] + infoSettings.pause_z_raise, infoSettings.pause_feedrate[Z_AXIS]);
           mustStoreCmd("G1 X%.3f Y%.3f F%d\n", infoSettings.pause_pos[X_AXIS], infoSettings.pause_pos[Y_AXIS], infoSettings.pause_feedrate[X_AXIS]);
         }
 
@@ -223,7 +247,7 @@ bool setPrintPause(bool is_pause, bool is_m0pause)
 
 void exitPrinting(void)
 {
-  memset(&infoPrinting,0,sizeof(PRINTING));
+  memset(&infoPrinting, 0, sizeof(PRINTING));
   ExitDir();
 }
 
@@ -232,6 +256,7 @@ void endPrinting(void)
   switch (infoFile.source)
   {
     case BOARD_SD:
+      request_M27(0);
       break;
 
     case TFT_UDISK:
@@ -242,11 +267,22 @@ void endPrinting(void)
   infoPrinting.printing = infoPrinting.pause = false;
   powerFailedClose();
   powerFailedDelete();
-  if(infoSettings.send_end_gcode == 1){
+  if((infoFile.source != BOARD_SD) && (infoSettings.send_end_gcode == 1))
+  {
     sendPrintCodes(1);
   }
+  if (infoSettings.print_summary)
+  {
+    infoMenu.cur = 0;
+    char tempstr[140];
+    u8 hour = infoPrinting.time / 3600;
+    u8 min = infoPrinting.time % 3600 / 60;
+    u8 sec = infoPrinting.time % 60;
+    sprintf(tempstr, (char *)textSelect(LABEL_PRINT_SUMMARY), hour, min, sec, filament_used / 1000);
+    resetFilamentUsed();
+    popupReminder(DIALOG_TYPE_INFO, LABEL_SCREEN_INFO, (u8 *)tempstr);
+  }
 }
-
 
 void printingFinished(void)
 {
@@ -264,6 +300,10 @@ void abortPrinting(void)
   {
     case BOARD_SD:
       infoHost.printing = false;
+      breakAndContinue(); //Several M108 is sent to Marlin because consecutive blocking oprations such as heat bed, heat extruder may defer processing of M524
+      breakAndContinue();
+      breakAndContinue();
+      breakAndContinue();
       request_M524();
       break;
 
@@ -289,7 +329,7 @@ void shutdown(void)
     if(fanIsType(i, FAN_TYPE_F)) mustStoreCmd("%s S0\n", fanCmd[i]);
   }
   mustStoreCmd("M81\n");
-  popupReminder(DIALOG_TYPE_INFO, textSelect(LABEL_SHUT_DOWN), textSelect(LABEL_SHUTTING_DOWN));
+  popupReminder(DIALOG_TYPE_INFO, LABEL_SHUT_DOWN, LABEL_SHUTTING_DOWN);
 }
 
 void shutdownLoop(void)
@@ -309,14 +349,15 @@ void shutdownLoop(void)
 void startShutdown(void)
 {
   char tempstr[75];
-  sprintf(tempstr, (char *)textSelect(LABEL_WAIT_TEMP_SHUT_DOWN), infoSettings.auto_off_temp);
+  labelChar(tempbody, LABEL_WAIT_TEMP_SHUT_DOWN);
+  sprintf(tempstr, tempbody, infoSettings.auto_off_temp);
 
   for(u8 i = 0; i < infoSettings.fan_count; i++)
   {
     if(fanIsType(i,FAN_TYPE_F)) mustStoreCmd("%s S255\n", fanCmd[i]);
   }
-  showDialog(DIALOG_TYPE_INFO,textSelect(LABEL_SHUT_DOWN), (u8 *)tempstr,
-              textSelect(LABEL_FORCE_SHUT_DOWN), textSelect(LABEL_CANCEL), shutdown, NULL, shutdownLoop);
+  setDialogText(LABEL_SHUT_DOWN, (u8 *)tempstr, LABEL_FORCE_SHUT_DOWN, LABEL_CANCEL);
+  showDialog(DIALOG_TYPE_INFO, shutdown, NULL, shutdownLoop);
 }
 
 
@@ -405,10 +446,22 @@ bool hasPrintingMenu(void)
 
 void loopCheckPrinting(void)
 {
-  if (infoHost.printing && !infoPrinting.printing) {
+  #if defined(ST7920_SPI) || defined(LCD2004_simulator)
+    if(infoMenu.menu[infoMenu.cur] == menuMarlinMode) return;
+  #endif
+
+  if (infoHost.printing && !infoPrinting.printing)
+  {
     infoPrinting.printing = true;
     if (!hasPrintingMenu())
+    {
       infoMenu.menu[++infoMenu.cur] = menuPrinting;
+    }
+  }
+
+  if (!infoPrinting.printing && (infoMenu.menu[infoMenu.cur] == menuPrinting) && infoSettings.print_summary)
+  {
+    infoMenu.cur = 0;
   }
 
   if (infoFile.source != BOARD_SD) return;
