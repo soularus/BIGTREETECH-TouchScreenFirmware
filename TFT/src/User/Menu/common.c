@@ -91,8 +91,8 @@ const LABEL itemToggle[ITEM_TOGGLE_NUM] =
 
 const uint16_t iconToggle[ITEM_TOGGLE_NUM] =
 {
-  ICONCHAR_TOGGLE_OFF,
-  ICONCHAR_TOGGLE_ON
+  CHARICON_TOGGLE_OFF,
+  CHARICON_TOGGLE_ON
 };
 
 // Check time elapsed against the time specified in milliseconds for displaying/updating info on screen
@@ -109,6 +109,78 @@ bool nextScreenUpdate(uint32_t duration)
   {
     return false;
   }
+}
+
+const void drawBorder(const GUI_RECT *rect, uint16_t color, uint16_t edgeDistance)
+{
+  //uint16_t origColor = GUI_GetColor();
+
+  GUI_SetColor(color);
+  GUI_DrawRect(rect->x0 + edgeDistance, rect->y0 + edgeDistance,
+               rect->x1 - edgeDistance, rect->y1 - edgeDistance);
+
+  //GUI_SetColor(origColor);
+}
+
+const void drawBackground(const GUI_RECT *rect, uint16_t bgColor, uint16_t edgeDistance)
+{
+  //uint16_t origBgColor = GUI_GetBkColor();
+
+  GUI_SetBkColor(bgColor);
+  GUI_ClearRect(rect->x0 + edgeDistance, rect->y0 + edgeDistance,
+                rect->x1 - edgeDistance, rect->y1 - edgeDistance);
+
+  //GUI_SetBkColor(origBgColor);
+}
+
+const void drawStandardValue(const GUI_RECT *rect, VALUE_TYPE valType, const void *val, bool largeFont,
+                             uint16_t color, uint16_t bgColor, uint16_t edgeDistance, bool clearBgColor)
+{
+  uint16_t origColor = GUI_GetColor();
+  uint16_t origBgColor = GUI_GetBkColor();
+
+  if (clearBgColor)
+    drawBackground(rect, bgColor, edgeDistance);
+
+  if (val != NULL)
+  {
+    char tempstr[20] = "\0";
+    const char * buf = tempstr;
+
+    switch (valType)
+    {
+      case VALUE_BYTE:
+        sprintf(tempstr, "%d", *((uint8_t *) val));
+        break;
+
+      case VALUE_INT:
+        sprintf(tempstr, "%d", *((uint16_t *) val));
+        break;
+
+      case VALUE_FLOAT:
+        sprintf(tempstr, "%.3f", *((float *) val));
+        break;
+
+      case VALUE_STRING:
+        buf = val;
+        break;
+
+      default:
+        break;
+    }
+
+    GUI_SetColor(color);
+    GUI_SetBkColor(bgColor);
+
+    setLargeFont(largeFont);
+    GUI_DispStringInRect(rect->x0 + edgeDistance, rect->y0 + edgeDistance,
+                         rect->x1 - edgeDistance, rect->y1 - edgeDistance,
+                         (uint8_t *) buf);
+    setLargeFont(false);
+  }
+
+  GUI_SetColor(origColor);
+  GUI_SetBkColor(origBgColor);
 }
 
 const bool warmupTemperature(uint8_t toolIndex, void (* callback)(void))
@@ -157,7 +229,7 @@ const void temperatureReDraw(uint8_t toolIndex, int16_t * temp, bool skipHeader)
 
   if (!skipHeader)
   {
-    sprintf(tempstr, "%-15s", heatDisplayID[toolIndex]);
+    sprintf(tempstr, "%-8s", heatDisplayID[toolIndex]);
     setLargeFont(false);
     GUI_DispString(exhibitRect.x0, exhibitRect.y0, (uint8_t *) tempstr);
     setLargeFont(true);
@@ -182,14 +254,14 @@ const void fanReDraw(uint8_t fanIndex, bool skipHeader)
 
   if (!skipHeader)
   {
-    sprintf(tempstr, "%-15s", fanID[fanIndex]);
+    sprintf(tempstr, "%-8s", fanID[fanIndex]);
     setLargeFont(false);
     GUI_DispString(exhibitRect.x0, exhibitRect.y0, (uint8_t *) tempstr);
     setLargeFont(true);
 
     if (infoSettings.fan_percentage == 1)
     {
-      GUI_DispStringCenter((exhibitRect.x0 + exhibitRect.x1) >> 1, exhibitRect.y0, (uint8_t *) "%");
+      GUI_DispStringCenter((exhibitRect.x0 + exhibitRect.x1) >> 1, exhibitRect.y0, (uint8_t *) " % ");
     }
     else
     {
@@ -215,7 +287,7 @@ const void extruderReDraw(uint8_t extruderIndex, float extrusion, bool skipHeade
 
   if (!skipHeader)
   {
-    sprintf(tempstr, "%-15s", extruderDisplayID[extruderIndex]);
+    sprintf(tempstr, "%-8s", extruderDisplayID[extruderIndex]);
     setLargeFont(false);
     GUI_DispString(exhibitRect.x0, exhibitRect.y0, (uint8_t *) tempstr);
     setLargeFont(true);
@@ -236,13 +308,12 @@ const void percentageReDraw(uint8_t itemIndex, bool skipHeader)
 
   if (!skipHeader)
   {
-    setLargeFont(false);
-
     if (itemIndex == 0)
       sprintf(tempstr, "%-15s", textSelect(LABEL_PERCENTAGE_SPEED));
     else
       sprintf(tempstr, "%-15s", textSelect(LABEL_PERCENTAGE_FLOW));
 
+    setLargeFont(false);
     GUI_DispString(exhibitRect.x0, exhibitRect.y0, (uint8_t *) tempstr);
     setLargeFont(true);
     GUI_DispStringCenter((exhibitRect.x0 + exhibitRect.x1) >> 1, exhibitRect.y0, (uint8_t *) "%");

@@ -4,8 +4,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "Settings.h"
 #include "menu.h"
-#include "Heat.h"
 
 #define ITEM_DEGREE_NUM         3
 #define ITEM_SPEED_NUM          3
@@ -14,6 +15,15 @@ extern "C" {
 #define ITEM_FINE_MOVE_LEN_NUM  3
 #define ITEM_EXT_LEN_NUM        5
 #define ITEM_TOGGLE_NUM         2
+
+typedef enum
+{
+  VALUE_NONE = 0,
+  VALUE_BYTE,
+  VALUE_INT,
+  VALUE_FLOAT,
+  VALUE_STRING,
+} VALUE_TYPE;
 
 extern uint8_t currentTool;
 extern uint8_t currentFan;
@@ -38,6 +48,13 @@ extern const LABEL itemToggle[ITEM_TOGGLE_NUM];
 extern const uint16_t iconToggle[ITEM_TOGGLE_NUM];
 
 bool nextScreenUpdate(uint32_t duration);
+
+extern const void drawBorder(const GUI_RECT *rect, uint16_t color, uint16_t edgeDistance);
+
+extern const void drawBackground(const GUI_RECT *rect, uint16_t bgColor, uint16_t edgeDistance);
+
+extern const void drawStandardValue(const GUI_RECT *rect, VALUE_TYPE valType, const void *val, bool largeFont,
+                                    uint16_t color, uint16_t bgColor, uint16_t edgeDistance, bool clearBgColor);
 
 extern const bool warmupTemperature(uint8_t toolIndex, void (* callback)(void));
 
