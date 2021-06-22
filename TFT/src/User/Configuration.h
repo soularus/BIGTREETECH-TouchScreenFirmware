@@ -355,7 +355,7 @@
  *
  * NOTE: Enable it, in case Marlin firmware does not properly support M600 on the mainboard.
  */
-#define EMULATE_M600 true  // To enabled: true | To disabled: false (Default: true)
+#define EMULATE_M600 false  // To enabled: true | To disabled: false (Default: true)
 
 /**
  * M601: Pause Print
@@ -571,7 +571,7 @@
  *    If you choose "Base64 PNG" on such a low RAM device it will automatically
  *    downgraded to "RGB565 bitmap" option.
  */
-#define THUMBNAIL_PARSER 0  // Default: 0
+#define THUMBNAIL_PARSER 2  // Default: 0
 
 //===========================================================================
 //=========================== Other Settings ================================
